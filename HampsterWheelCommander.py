@@ -9,50 +9,48 @@
 # https://whirling.top/fhh/LICENSE.txt
 # ---
 
-import darkdetect
-import customtkinter as ctk
-import pygame
 import platform
 import subprocess
 import math
 
-# Linux only
+# 1. Create the CustomTkinter window FIRST (before darkdetect or pygame!)
+import customtkinter as ctk
+app = ctk.CTk()
+app.geometry("800x600")
+app.title("Hampster Mission Control")
+
+# Force macOS Cocoa to register TKApplication as the global NSApp right now
+app.update()
+
+# 2. Now safely run darkdetect and set appearance mode
+import darkdetect
+
 if platform.system().lower() == "linux":
     def theme():
         try:
-            # Capture color-scheme
             cs_out = subprocess.run(
                 ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
                 capture_output=True, text=True
             )
-            cs_stdout = cs_out.stdout.lower().strip()
-
-            # Capture gtk-theme
             gt_out = subprocess.run(
                 ["gsettings", "get", "org.gnome.desktop.interface", "gtk-theme"],
                 capture_output=True, text=True
             )
-            gt_stdout = gt_out.stdout.lower().strip()
-
+            if "-dark" in gt_out.stdout.lower() or "-dark" in cs_out.stdout.lower():
+                return "Dark"
         except Exception:
-            return "Light"
-
-        if "-dark" in gt_stdout or "-dark" in cs_stdout:
-            return "Dark"
+            pass
         return "Light"
-    
     darkdetect.theme = theme
-    
-# Init pygame
-pygame.init()
-pygame.joystick.init()
 
-# Custom Window
 ctk.set_appearance_mode(darkdetect.theme().lower())
 
-app = ctk.CTk()
-app.geometry("800x600")
-app.title("Hampster Mission Control")
+# 3. Import and init Pygame AFTER TKApplication owns NSApp
+import os
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+import pygame
+pygame.init()
+pygame.joystick.init()
 
 # Global vars
 joystick_refs = []
