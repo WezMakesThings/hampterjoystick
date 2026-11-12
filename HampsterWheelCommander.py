@@ -59,14 +59,11 @@ button_labels = []
 current_selection = None
 
 # Matlab setup
-import matlab.engine
-import numpy as np
 
 # Connect 'engine' that is used to pass data to and from matlab.
-mtlb = matlab.engine.connect_matlab(background=True)
-# Data structure for input axes
-
-# Data structure for output telemetry
+def connect_matlab():
+    print("Attempting to connect to matlab")
+    
 
 # Joystick update Functions
 def update_joysticks(js_element: ctk.CTkComboBox, axes_frame, buttons_frame):
@@ -218,7 +215,12 @@ def main():
     # Main layout
     global joystick_selector
     joystick_selector = ctk.CTkComboBox(app, values=[], command=joystick_selected, variable=ctk.StringVar(value="No Joystick found!"))
-    joystick_selector.grid(row=0, column=0, columnspan=2, pady=20, padx=20, sticky="ew")
+    joystick_selector.grid(row=0, column=0, columnspan=1, pady=20, padx=20, sticky="ew")
+
+    # Matlab Connection
+    matconnect = "Connect Matlab"
+    matlab_connection = ctk.CTkButton(app, width=140, height=28, corner_radius=5 ,command=connect_matlab, text="Connect Matlab", textvariable=matconnect)
+    matlab_connection.grid(row=0, column=1, sticky="e", padx=20, pady=20)
 
     global axes_frame, buttons_frame
     axes_frame = ctk.CTkScrollableFrame(app, label_text="Controller Axes")
