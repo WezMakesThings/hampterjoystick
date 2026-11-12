@@ -13,16 +13,16 @@ import platform
 import subprocess
 import math
 
-# 1. Create the CustomTkinter window FIRST (before darkdetect or pygame!)
+# Custom window
 import customtkinter as ctk
 app = ctk.CTk()
 app.geometry("800x600")
 app.title("Hampster Mission Control")
 
-# Force macOS Cocoa to register TKApplication as the global NSApp right now
+# Fixes MAC for some reason
 app.update()
 
-# 2. Now safely run darkdetect and set appearance mode
+# Set theme
 import darkdetect
 
 if platform.system().lower() == "linux":
@@ -45,7 +45,7 @@ if platform.system().lower() == "linux":
 
 ctk.set_appearance_mode(darkdetect.theme().lower())
 
-# 3. Import and init Pygame AFTER TKApplication owns NSApp
+# Init Pygame
 import os
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 import pygame
@@ -57,6 +57,16 @@ joystick_refs = []
 axis_labels = []
 button_labels = []
 current_selection = None
+
+# Matlab setup
+import matlab.engine
+import numpy as np
+
+# Connect 'engine' that is used to pass data to and from matlab.
+mtlb = matlab.engine.connect_matlab(background=True)
+# Data structure for input axes
+
+# Data structure for output telemetry
 
 # Joystick update Functions
 def update_joysticks(js_element: ctk.CTkComboBox, axes_frame, buttons_frame):
