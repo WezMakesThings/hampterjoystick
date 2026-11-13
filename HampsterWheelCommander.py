@@ -48,6 +48,7 @@ ctk.set_appearance_mode(darkdetect.theme().lower())
 # Init Pygame
 import os
 os.environ["SDL_VIDEODRIVER"] = "dummy"
+os.environ["SDL_JOYSTICK_HIDAPI"] = "0"
 import pygame
 pygame.init()
 pygame.joystick.init()
