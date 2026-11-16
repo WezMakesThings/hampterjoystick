@@ -18,7 +18,7 @@ import time
 
 # Joystick transmission settings
 DEADZONE = 0.08  # 8% deadzone
-SEND_RATE = 500
+SEND_RATE = 100 # 500HZ
 
 # MATLAB TCP settings
 HOST = "127.0.0.1"
