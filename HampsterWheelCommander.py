@@ -13,6 +13,20 @@ import platform
 import subprocess
 import math
 
+import threading
+import time
+
+# Joystick transmission settings
+DEADZONE = 0.08  # 8% deadzone
+SEND_RATE = 500
+
+# MATLAB TCP settings
+HOST = "127.0.0.1"
+PORT = 50000
+
+client_socket = None
+socket_lock = threading.Lock()
+
 # Custom window
 import customtkinter as ctk
 app = ctk.CTk()
@@ -45,6 +59,15 @@ if platform.system().lower() == "linux":
 
 ctk.set_appearance_mode(darkdetect.theme().lower())
 
+def apply_deadzone(value, deadzone=DEADZONE):
+    if abs(value) <= deadzone:
+        return 0.0
+
+    return math.copysign(
+        (abs(value) - deadzone) / (1.0 - deadzone),
+        value
+    )
+
 # Init Pygame
 import os
 os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -60,10 +83,49 @@ button_labels = []
 current_selection = None
 
 # Matlab setup
-
+import socket
+import struct
 # Connect 'engine' that is used to pass data to and from matlab.
+def matlab_server():
+    global client_socket
+
+    print("Starting MATLAB TCP server...")
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((HOST, PORT))
+        server.listen(1)
+
+        print(f"Waiting for Simulink on {HOST}:{PORT}...")
+
+        while True:
+            try:
+                conn, address = server.accept()
+                print(f"MATLAB connected: {address}")
+
+                with socket_lock:
+                    if client_socket:
+                        client_socket.close()
+
+                    client_socket = conn
+
+            except OSError as e:
+                print(f"Server error: {e}")
+                break
+
+
 def connect_matlab():
-    print("Attempting to connect to matlab")
+    global server_thread
+
+    if 'server_thread' in globals() and server_thread.is_alive():
+        print("MATLAB server is already running.")
+        return
+
+    server_thread = threading.Thread(
+        target=matlab_server,
+        daemon=True
+    )
+    server_thread.start()
     
 
 # Joystick update Functions
@@ -176,34 +238,90 @@ def joystick_selected(choice):
 # Joystick update loop
 def update_joystick_values():
     global current_selection
+
     if current_selection is not None:
         pygame.event.pump()
 
-        # Update axis values
+        # Collect joystick axes
+        axes = []
+
         for i, (bar_frame, fill_frame, value_label) in enumerate(axis_labels):
             value = current_selection.get_axis(i)
-            value_label.configure(text=f"Axis {i+1}: {value:.3f}")
+
+            axes.append(value)
+
+            # Display raw joystick value
+            value_label.configure(
+                text=f"Axis {i+1}: {value:.3f}"
+            )
 
             # Update bar visualization
             bar_width = bar_frame.winfo_width()
             fill_width = bar_width * abs(value) / 2
+
             fill_frame.configure(width=int(fill_width))
 
-            # Position based on value
             if value >= 0:
-                fill_frame.place(relx=0.5, rely=0.5, anchor="w")
+                fill_frame.place(
+                    relx=0.5,
+                    rely=0.5,
+                    anchor="w"
+                )
             else:
-                fill_frame.place(relx=0.5, rely=0.5, anchor="e")
+                fill_frame.place(
+                    relx=0.5,
+                    rely=0.5,
+                    anchor="e"
+                )
+
+        # Send joystick axes to MATLAB
+        send_joystick_data(axes)
 
         # Update button states
         for i, label in enumerate(button_labels):
             state = current_selection.get_button(i)
+
             label.configure(
                 text=f"B{i+1}",
                 text_color="lime" if state else "red",
             )
 
-    app.after(50, update_joystick_values)
+    app.after(1000 // SEND_RATE, update_joystick_values)
+
+def send_joystick_data(axes):
+    global client_socket
+
+    if client_socket is None:
+        return
+
+    try:
+        # Apply deadzone
+        processed_axes = [
+            apply_deadzone(axis)
+            for axis in axes
+        ]
+
+        # Pack axes as big-endian 32-bit floats
+        packet = struct.pack(
+            f"!{len(processed_axes)}f",
+            *processed_axes
+        )
+
+        with socket_lock:
+            if client_socket:
+                client_socket.sendall(packet)
+
+    except (OSError, ConnectionError) as e:
+        print(f"MATLAB disconnected: {e}")
+
+        with socket_lock:
+            if client_socket:
+                try:
+                    client_socket.close()
+                except OSError:
+                    pass
+
+                client_socket = None
     
 # Poll for joystick connect/disconnect
 def poll_pygame_events():
